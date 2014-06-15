@@ -1,20 +1,167 @@
-# Reproducible Research: Peer Assessment 1
+Submission for Peer Assesment 1: Reproducible Research
+======================================================
 
+## Loading and preprocessing data
 
-## Loading and preprocessing the data
+Loading the dataset:
 
+```{r cache=FALSE}
+rm(list = as.character(ls()))
+setwd("C:\\Misc\\Git\\RepData_PeerAssessment1")
 
+activity_raw <- read.csv(unz("activity.zip",filename="activity.csv"))
+```
+
+Cleaning the dataset (removing records with NAs in steps).
+
+```{r cache=FALSE}
+activity_cleaned<-activity_raw[!is.na(activity_raw$steps),]
+```
 
 ## What is mean total number of steps taken per day?
 
+Aggregating to find daily activity:
+```{r cache=FALSE}
+daily_activity<-aggregate(steps ~ date, data=activity_cleaned, sum)
+```
 
+Plotting histogram:
+```{r cache=FALSE}
+hist(daily_activity$steps, col="Green", breaks=20)
+rug(daily_activity$steps)
+```
+
+Mean and median of the number of steps take per day:
+```{r cache=FALSE}
+mean1 <- mean(daily_activity$steps)
+```
+```{r echo=FALSE, cache=FALSE}
+mean1
+```
+```{r}
+median1 <- median(daily_activity$steps)
+```
+```{r echo=FALSE, cache=FALSE}
+median1
+```
 
 ## What is the average daily activity pattern?
 
+### Calculating average daily activity, and re-coding intervals for better plotting:
+```{r cache=FALSE}
+interval_activity<-aggregate(steps~interval, data = activity_cleaned, mean)
 
+# re-coding interval consistently for better plotting
+interval_activity$i <- seq(0:(dim(interval_activity)[1] - 1))
+interval_activity$interval_recoded <- interval_activity$i*5
+```
+
+Plotting averaged 5-minute interval:
+```{r cache=FALSE}
+plot(x=interval_activity$interval_recoded, y=interval_activity$steps,type="l",
+     xlab="5-minute interval ", ylab="average number of steps taken")
+```
+
+Finding the 5-minute interval with maximum number of steps:
+```{r cache=FALSE}
+bestInterval <- interval_activity[interval_activity$steps==max(interval_activity$steps),]$interval_recoded
+
+# Calculating time at the beginning of this interval
+from_hr<-as.integer(bestInterval/60)
+from_min<-bestInterval - as.integer(bestInterval/60)*60
+from<-paste(from_hr,from_min, sep=":")
+
+# Calculating time at the end  of this interval
+to_hr<-as.integer((bestInterval+5)/60)
+to_min<-(bestInterval+5) - as.integer((bestInterval+4)/60)*60
+to<-paste(to_hr,to_min, sep=":")
+```
+
+Maximum number of steps were taken from `r from` hours (inclusive) to `r to` hours (excluded).  
+  
 
 ## Imputing missing values
 
+### Calculating total number of missing values
+
+Calculating total number of missing values:
+```{r cache=FALSE}
+cnt_na <- table(is.na(activity_raw$steps))[["TRUE"]]
+```
+`r cnt_na` of `r dim(activity_raw)[1]` values in the dataset are missing.
+
+Creating new data set by replacing NAs with mean value for respective interval:
+
+```{r cache=FALSE}
+activity_imputed<-activity_raw
+
+for (i in seq(1:dim(activity_imputed)[1]))
+{
+  if(is.na(activity_imputed[i,]$steps))
+  {
+    activity_imputed[i,]$steps <- interval_activity[interval_activity$interval == activity_imputed[i,]$interval,]$steps
+  }
+}
+```
+
+Aggregating daily activity from the imputed dataset:
+
+```{r cache=FALSE}
+daily_activity_imputed<-aggregate(steps ~ date, data=activity_imputed, sum)
+```
+
+Plotting histogram for number of steps taken (from imputed dataset):
+```{r cache=FALSE}
+hist(daily_activity_imputed$steps, col="Green", breaks=20)
+rug(daily_activity_imputed$steps)
+```
+
+Mean and median of the number of steps take per day:
+```{r cache=FALSE}
+mean2 <- mean(daily_activity_imputed$steps)
+```
+```{r echo=FALSE,  cache=FALSE}
+mean2
+```
+```{r cache=FALSE}
+median2 <- median(daily_activity_imputed$steps)
+```
+```{r echo=FALSE, cache=FALSE}
+median2
+```
+
+Mean increased by `r mean2-mean1`
+
+Adding factor variable distinguishing weekdays from weekends:
+```{r cache=FALSE}
+day_indicator<-weekdays(as.Date(activity_imputed$date, "%Y-%m-%d"))
+day_indicator[day_indicator=="Sunday" | day_indicator=="Saturday"]<-"weekend"
+day_indicator[day_indicator!="weekend"]<-"weekday"
+activity_imputed$weekday_type <- as.factor(day_indicator)
+```
+
+Carving-out seperate datasets for weekday and weekend activity:
+```{r cache=FALSE}
+data_wd<-activity_imputed[activity_imputed$weekday_type=="weekday",]
+interval_activity_weekday<-aggregate(steps~interval, data = data_wd, mean)
+data_we<-activity_imputed[activity_imputed$weekday_type=="weekend",]
+interval_activity_weekend<-aggregate(steps~interval, data = data_we, mean)
+```
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+Re-coding interval in weekday and weekend datasets for better plotting:
+```{r cache=FALSE}
+interval_activity_weekday$i <- seq(1:dim(interval_activity_weekday)[1])
+interval_activity_weekday$interval_recoded <- interval_activity_weekday$i*5
+
+interval_activity_weekend$i <- seq(1:dim(interval_activity_weekend)[1])
+interval_activity_weekend$interval_recoded <- interval_activity_weekend$i*5
+```
+
+Plotting
+```{r cache=FALSE}
+par(mfrow=c(2,1))
+
+plot(x=interval_activity_weekend$interval_recoded, y=interval_activity_weekend$steps,type="l", xlab="weekend intervals", ylab="Number of Steps")
+plot(x=interval_activity_weekday$interval_recoded, y=interval_activity_weekday$steps,type="l", xlab="weekday intervals", ylab="Number of Steps")
+```
